@@ -15,16 +15,22 @@ export class UndoRedoManager<T> {
     }
 
     public undo(): T | null {
-        if (!this.past.length) return null
+        if (this.past.length === 0) return null
+
+        const previous = this.past.pop() as T
         this.future.unshift(this.present)
-        this.present = this.past.pop()!
+        this.present = previous
+
         return this.present
     }
 
     public redo(): T | null {
-        if (!this.future.length) return null
+        if (this.future.length === 0) return null
+
+        const next = this.future.shift() as T
         this.past.push(this.present)
-        this.present = this.future.shift()!
+        this.present = next
+
         return this.present
     }
 }

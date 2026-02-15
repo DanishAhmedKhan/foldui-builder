@@ -1,1 +1,1 @@
-export * from './core/FoldUIBuilder'
+export * from './core/SchemaBuilder'

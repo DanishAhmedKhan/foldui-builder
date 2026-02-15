@@ -4,10 +4,36 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FoldUIBuilder</title>
+    <title>SchemaBuilder</title>
 </head>
 
 <body>
+    <script type="module">
+        import { SchemaBuilder } from './src/index'
+
+        const builder = new SchemaBuilder()
+
+        const rootId = builder.getRootId()
+
+        const containerId = builder
+            .add({
+                type: 'container',
+                style: {
+                    maxWidth: '1200px',
+                    margin: '0 auto',
+                }
+            })
+            .into(rootId)
+
+        // builder.add('container').into(rootId)
+        builder.add('text').into(containerId)
+        builder.add('button').into(containerId)
+
+        const renderSchema = builder.toRenderSchema()
+
+        console.log(renderSchema)
+
+    </script>
 </body>
 
 </html>
