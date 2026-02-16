@@ -19,15 +19,20 @@
             .add({
                 type: 'container',
                 style: {
-                    maxWidth: '1200px',
-                    margin: '0 auto',
+                    container: {
+                        maxWidth: '500px',
+                        margin: '0 auto',
+                        padding: '100px 0px',
+                    }
                 }
             })
             .into(rootId)
 
-        // builder.add('container').into(rootId)
-        builder.add('text').into(containerId)
-        builder.add('button').into(containerId)
+        const textId = builder.add('text').into(containerId)
+        const buttonId = builder.add('button').into(containerId)
+        builder.updateProps(textId, {
+            text: 'FoldUI is amazing!'
+        })
 
         const renderSchema = builder.toRenderSchema()
 

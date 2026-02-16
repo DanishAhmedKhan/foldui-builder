@@ -1,6 +1,6 @@
 import { deepClone } from '../helper/deepClone'
 import type { BuilderDocumentSchema, BuilderNode, NodeType } from '../types/NodeTypes'
-import { UndoRedoManager } from './UndoRedoManager'
+import { HistoryManager } from './HistoryManager'
 
 type AddInput =
     | string
@@ -12,7 +12,7 @@ type AddInput =
       }
 
 export class SchemaBuilder {
-    private history: UndoRedoManager<BuilderDocumentSchema>
+    private history: HistoryManager<BuilderDocumentSchema>
 
     constructor() {
         const root = this.createNode({ type: 'fragment' })
@@ -25,7 +25,7 @@ export class SchemaBuilder {
             selection: root.id,
         }
 
-        this.history = new UndoRedoManager(schema)
+        this.history = new HistoryManager(schema)
     }
 
     private get schema(): BuilderDocumentSchema {
@@ -64,10 +64,6 @@ export class SchemaBuilder {
         return build(rootId)
     }
 
-    // -----------------------------------------
-    // ADD
-    // -----------------------------------------
-
     public add(input: AddInput, extra?: Omit<BuilderNode, 'id' | 'parent' | 'children' | 'type'>) {
         const config = this.normalizeAddInput(input, extra)
         const node = this.createNode(config)
@@ -100,10 +96,6 @@ export class SchemaBuilder {
         }
     }
 
-    // -----------------------------------------
-    // UPDATE PROPS
-    // -----------------------------------------
-
     public updateProps(nodeId: string, newProps: Record<string, any>) {
         const node = this.schema.nodes[nodeId]
         if (!node) throw new Error('Node not found')
@@ -117,10 +109,6 @@ export class SchemaBuilder {
 
         this.history.push(next)
     }
-
-    // -----------------------------------------
-    // UPDATE STYLE
-    // -----------------------------------------
 
     public updateStyle(nodeId: string, newStyle: Record<string, any>) {
         const node = this.schema.nodes[nodeId]
@@ -136,10 +124,6 @@ export class SchemaBuilder {
         this.history.push(next)
     }
 
-    // -----------------------------------------
-    // UPDATE RESPONSIVE
-    // -----------------------------------------
-
     public updateResponsive(nodeId: string, newResponsive: Record<string, any>) {
         const node = this.schema.nodes[nodeId]
         if (!node) throw new Error('Node not found')
@@ -154,10 +138,6 @@ export class SchemaBuilder {
         this.history.push(next)
     }
 
-    // -----------------------------------------
-    // REMOVE
-    // -----------------------------------------
-
     public remove(nodeId: string) {
         if (nodeId === this.schema.rootId) return
 
@@ -165,10 +145,6 @@ export class SchemaBuilder {
         this.removeInternal(nodeId, next)
         this.history.push(next)
     }
-
-    // -----------------------------------------
-    // MOVE
-    // -----------------------------------------
 
     public move(nodeId: string) {
         if (nodeId === this.schema.rootId) {
@@ -190,10 +166,6 @@ export class SchemaBuilder {
         }
     }
 
-    // -----------------------------------------
-    // SELECTION
-    // -----------------------------------------
-
     public select(nodeId: string | null) {
         const next = deepClone(this.schema)
         next.selection = nodeId
@@ -204,10 +176,6 @@ export class SchemaBuilder {
         return this.schema.selection
     }
 
-    // -----------------------------------------
-    // UNDO / REDO
-    // -----------------------------------------
-
     public undo(): boolean {
         return this.history.undo() !== null
     }
@@ -216,9 +184,17 @@ export class SchemaBuilder {
         return this.history.redo() !== null
     }
 
-    // -----------------------------------------
-    // INTERNALS
-    // -----------------------------------------
+    public transaction(fn: () => void) {
+        this.history.begin()
+
+        try {
+            fn()
+            this.history.commit()
+        } catch (err) {
+            this.history.cancel()
+            throw err
+        }
+    }
 
     private createNode(config: {
         type: string
