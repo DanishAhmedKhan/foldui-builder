@@ -8,8 +8,10 @@
 </head>
 
 <body>
+    <div id="container"></div>
     <script type="module">
         import { SchemaBuilder } from './src/index'
+        import { Fold } from 'foldui'
 
         const builder = new SchemaBuilder()
 
@@ -30,13 +32,26 @@
 
         const textId = builder.add('text').into(containerId)
         const buttonId = builder.add('button').into(containerId)
-        builder.updateProps(textId, {
+        builder.updateField(textId, 'props', {
+            tag: 'h1',
             text: 'FoldUI is amazing!'
         })
+        builder.patchField(textId, 'props', {
+            tag: 'h2',
+        })
+        builder.updateField(buttonId, 'style', {
+            button: {
+                background: 'coral'
+            }
+        })
+        builder.patchPath(buttonId, 'style.button.borderRadius', '20px')
+
 
         const renderSchema = builder.toRenderSchema()
 
-        console.log(renderSchema)
+        const html = Fold.render(renderSchema)
+        const containerEl = document.getElementById('container')
+        containerEl.appendChild(html)
 
     </script>
 </body>

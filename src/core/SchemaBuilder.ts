@@ -1,14 +1,15 @@
 import { deepClone } from '../helper/deepClone'
 import type { BuilderDocumentSchema, BuilderNode, NodeType } from '../types/NodeTypes'
 import { HistoryManager } from './HistoryManager'
+import { NodeSpec } from 'foldui'
+
+type NodeField = keyof typeof NodeSpec.fields
 
 type AddInput =
     | string
     | {
           type: string
-          props?: Record<string, any>
-          style?: Record<string, any>
-          responsive?: Record<string, any>
+          [key: string]: any
       }
 
 export class SchemaBuilder {
@@ -19,9 +20,7 @@ export class SchemaBuilder {
 
         const schema: BuilderDocumentSchema = {
             rootId: root.id,
-            nodes: {
-                [root.id]: root,
-            },
+            nodes: { [root.id]: root },
             selection: root.id,
         }
 
@@ -51,21 +50,23 @@ export class SchemaBuilder {
             const node = nodes[id]
             if (!node) throw new Error(`Node not found: ${id}`)
 
-            return {
-                id: node.id,
-                type: node.type,
-                props: node.props,
-                style: node.style,
-                responsive: node.responsive,
-                children: node.children.map(build),
+            const result: any = {}
+
+            for (const key of Object.keys(NodeSpec.fields) as NodeField[]) {
+                if (key === 'children') continue
+                result[key] = (node as any)[key]
             }
+
+            result.children = node.children.map(build)
+
+            return result
         }
 
         return build(rootId)
     }
 
-    public add(input: AddInput, extra?: Omit<BuilderNode, 'id' | 'parent' | 'children' | 'type'>) {
-        const config = this.normalizeAddInput(input, extra)
+    public add(input: AddInput) {
+        const config = this.normalizeAddInput(input)
         const node = this.createNode(config)
 
         return {
@@ -78,64 +79,74 @@ export class SchemaBuilder {
         }
     }
 
-    private normalizeAddInput(input: AddInput, extra?: Omit<BuilderNode, 'id' | 'parent' | 'children' | 'type'>) {
+    private normalizeAddInput(input: AddInput) {
         if (typeof input === 'string') {
-            return {
-                type: input,
-                props: extra?.props ?? {},
-                style: extra?.style ?? {},
-                responsive: extra?.responsive ?? {},
-            }
+            return { type: input }
         }
 
-        return {
-            type: input.type,
-            props: input.props ?? {},
-            style: input.style ?? {},
-            responsive: input.responsive ?? {},
-        }
+        return input
     }
 
-    public updateProps(nodeId: string, newProps: Record<string, any>) {
+    public updateField(nodeId: string, field: NodeField, value: any) {
+        if (!(field in NodeSpec.fields)) {
+            throw new Error(`Invalid field "${field}"`)
+        }
+
+        const node = this.schema.nodes[nodeId]
+        if (!node) throw new Error('Node not found')
+
+        const next = deepClone(this.schema)
+        ;(next.nodes[nodeId] as any)[field] = value
+
+        this.history.push(next)
+    }
+
+    public patchField(nodeId: string, field: NodeField, patch: Record<string, any>) {
+        if (!(field in NodeSpec.fields)) {
+            throw new Error(`Invalid field "${field}"`)
+        }
+
         const node = this.schema.nodes[nodeId]
         if (!node) throw new Error('Node not found')
 
         const next = deepClone(this.schema)
 
-        next.nodes[nodeId].props = {
-            ...next.nodes[nodeId].props,
-            ...newProps,
+        ;(next.nodes[nodeId] as any)[field] = {
+            ...(next.nodes[nodeId] as any)[field],
+            ...patch,
         }
 
         this.history.push(next)
     }
 
-    public updateStyle(nodeId: string, newStyle: Record<string, any>) {
+    public patchPath(nodeId: string, path: string | (string | number)[], value: any) {
         const node = this.schema.nodes[nodeId]
         if (!node) throw new Error('Node not found')
 
+        const normalizedPath = Array.isArray(path) ? path : path.split('.')
+
         const next = deepClone(this.schema)
 
-        next.nodes[nodeId].style = {
-            ...next.nodes[nodeId].style,
-            ...newStyle,
-        }
+        next.nodes[nodeId] = this.setDeepImmutable(next.nodes[nodeId], normalizedPath, value)
 
         this.history.push(next)
     }
 
-    public updateResponsive(nodeId: string, newResponsive: Record<string, any>) {
-        const node = this.schema.nodes[nodeId]
-        if (!node) throw new Error('Node not found')
+    private setDeepImmutable(obj: any, path: (string | number)[], value: any): any {
+        if (path.length === 0) return obj
 
-        const next = deepClone(this.schema)
+        const [key, ...rest] = path
 
-        next.nodes[nodeId].responsive = {
-            ...next.nodes[nodeId].responsive,
-            ...newResponsive,
+        const clone = Array.isArray(obj) ? [...obj] : { ...obj }
+
+        if (rest.length === 0) {
+            clone[key] = value
+        } else {
+            const currentChild = obj && obj[key] !== undefined ? obj[key] : {}
+            clone[key] = this.setDeepImmutable(currentChild, rest, value)
         }
 
-        this.history.push(next)
+        return clone
     }
 
     public remove(nodeId: string) {
@@ -186,7 +197,6 @@ export class SchemaBuilder {
 
     public transaction(fn: () => void) {
         this.history.begin()
-
         try {
             fn()
             this.history.commit()
@@ -196,30 +206,27 @@ export class SchemaBuilder {
         }
     }
 
-    private createNode(config: {
-        type: string
-        props?: Record<string, any>
-        style?: Record<string, any>
-        responsive?: Record<string, any>
-    }): BuilderNode {
-        return {
+    private createNode(config: { type: string; [key: string]: any }): BuilderNode {
+        const node: any = {
             id: crypto.randomUUID(),
-            type: config.type,
             parent: null,
             children: [],
-            props: config.props ?? {},
-            style: config.style ?? {},
-            responsive: config.responsive ?? {},
         }
+
+        for (const key in NodeSpec.defaults) {
+            node[key] = deepClone((NodeSpec.defaults as any)[key])
+        }
+
+        for (const key in config) {
+            node[key] = config[key]
+        }
+
+        return node
     }
 
     private attach(node: BuilderNode, parentId: string, index: number | undefined, schema: BuilderDocumentSchema) {
         const parent = schema.nodes[parentId]
         if (!parent) throw new Error('Parent not found')
-
-        if (!this.canAcceptChild(parent.type, node.type)) {
-            throw new Error(`${parent.type} cannot contain ${node.type}`)
-        }
 
         node.parent = parentId
         schema.nodes[node.id] = node
@@ -258,19 +265,5 @@ export class SchemaBuilder {
         }
 
         delete schema.nodes[nodeId]
-    }
-
-    private canAcceptChild(parentType: string, childType: string): boolean {
-        if (parentType === 'text') return false
-
-        if (parentType === 'list') {
-            return childType === 'list-item'
-        }
-
-        if (parentType === 'list-item') {
-            return childType === 'text' || childType === 'image'
-        }
-
-        return true
     }
 }
