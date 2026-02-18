@@ -10,10 +10,13 @@
 <body>
     <div id="container"></div>
     <script type="module">
-        import { SchemaBuilder } from './src/index'
-        import { Fold } from 'foldui'
 
-        const builder = new SchemaBuilder()
+        import { SchemaBuilder } from './src/index'
+        import { Fold, NodeSpec } from 'foldui'
+
+        console.log(NodeSpec)
+
+        const builder = new SchemaBuilder(NodeSpec)
 
         const rootId = builder.getRootId()
 

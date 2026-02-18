@@ -7,5 +7,8 @@ export default defineConfig({
             name: 'FoldUIBuilder',
             fileName: 'foldui-builder',
         },
+        rollupOptions: {
+            external: ['foldui'],
+        },
     },
 })

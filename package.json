@@ -3,18 +3,24 @@
     "version": "0.0.1",
     "type": "module",
     "description": "A programmatic builder for FoldUI documents.",
-    "main": "./dist/foldui-builder.cjs.js",
-    "module": "./dist/foldui-builder.es.js",
-    "unpkg": "./dist/foldui-builder.umd.js",
-    "jsdelivr": "./dist/foldui-builder.umd.js",
+    "author": "Danish Ahmed Khan",
+    "license": "MIT",
+    "main": "./dist/foldui-builder.umd.cjs",
+    "module": "./dist/foldui-builder.js",
     "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/foldui-builder.js",
+            "require": "./dist/foldui-builder.umd.cjs"
+        }
+    },
     "files": [
         "dist"
     ],
     "scripts": {
         "dev": "vite",
-        "build": "vite build && tsc",
-        "preview": "vite preview"
+        "build": "vite build && tsc"
     },
     "keywords": [
         "foldui",
@@ -24,13 +30,11 @@
         "document-builder",
         "ui-schema"
     ],
-    "author": "Danish Ahmed Khan",
-    "license": "MIT",
     "devDependencies": {
         "typescript": "~5.9.3",
         "vite": "^7.2.4"
     },
-    "dependencies": {
-        "foldui": "*"
+    "peerDependencies": {
+        "foldui": "^0.0.1"
     }
 }

@@ -1,9 +1,11 @@
 import { deepClone } from '../helper/deepClone'
 import type { BuilderDocumentSchema, BuilderNode, NodeType } from '../types/NodeTypes'
 import { HistoryManager } from './HistoryManager'
-import { NodeSpec } from 'foldui'
 
-type NodeField = keyof typeof NodeSpec.fields
+export interface GenericNodeSpec {
+    fields: Record<string, any>
+    defaults: Record<string, any>
+}
 
 type AddInput =
     | string
@@ -12,10 +14,13 @@ type AddInput =
           [key: string]: any
       }
 
-export class SchemaBuilder {
+export class SchemaBuilder<TSpec extends GenericNodeSpec> {
     private history: HistoryManager<BuilderDocumentSchema>
+    private nodeSpec: TSpec
 
-    constructor() {
+    constructor(nodeSpec: TSpec) {
+        this.nodeSpec = nodeSpec
+
         const root = this.createNode({ type: 'fragment' })
 
         const schema: BuilderDocumentSchema = {
@@ -45,6 +50,7 @@ export class SchemaBuilder {
 
     public toRenderSchema(): NodeType {
         const { nodes, rootId } = this.schema
+        const fields = this.nodeSpec.fields
 
         const build = (id: string): NodeType => {
             const node = nodes[id]
@@ -52,7 +58,7 @@ export class SchemaBuilder {
 
             const result: any = {}
 
-            for (const key of Object.keys(NodeSpec.fields) as NodeField[]) {
+            for (const key of Object.keys(fields)) {
                 if (key === 'children') continue
                 result[key] = (node as any)[key]
             }
@@ -83,12 +89,11 @@ export class SchemaBuilder {
         if (typeof input === 'string') {
             return { type: input }
         }
-
         return input
     }
 
-    public updateField(nodeId: string, field: NodeField, value: any) {
-        if (!(field in NodeSpec.fields)) {
+    public updateField(nodeId: string, field: string, value: any) {
+        if (!(field in this.nodeSpec.fields)) {
             throw new Error(`Invalid field "${field}"`)
         }
 
@@ -101,8 +106,8 @@ export class SchemaBuilder {
         this.history.push(next)
     }
 
-    public patchField(nodeId: string, field: NodeField, patch: Record<string, any>) {
-        if (!(field in NodeSpec.fields)) {
+    public patchField(nodeId: string, field: string, patch: Record<string, any>) {
+        if (!(field in this.nodeSpec.fields)) {
             throw new Error(`Invalid field "${field}"`)
         }
 
@@ -136,7 +141,6 @@ export class SchemaBuilder {
         if (path.length === 0) return obj
 
         const [key, ...rest] = path
-
         const clone = Array.isArray(obj) ? [...obj] : { ...obj }
 
         if (rest.length === 0) {
@@ -213,8 +217,8 @@ export class SchemaBuilder {
             children: [],
         }
 
-        for (const key in NodeSpec.defaults) {
-            node[key] = deepClone((NodeSpec.defaults as any)[key])
+        for (const key in this.nodeSpec.defaults) {
+            node[key] = deepClone((this.nodeSpec.defaults as any)[key])
         }
 
         for (const key in config) {
