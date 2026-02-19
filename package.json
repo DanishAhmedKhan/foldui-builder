@@ -35,6 +35,6 @@
         "vite": "^7.2.4"
     },
     "peerDependencies": {
-        "foldui": "^0.0.1"
+        "foldui": "^0.0.2"
     }
 }
