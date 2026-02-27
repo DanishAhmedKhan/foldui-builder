@@ -1,18 +1,14 @@
-import { deepClone } from '../helper/deepClone'
-import type { BuilderDocumentSchema, BuilderNode, NodeType } from '../types/NodeTypes'
 import { HistoryManager } from './HistoryManager'
+import { deepClone } from '../helper/deepClone'
+import type { BuilderDocumentSchema, BuilderNode } from '../types/NodeTypes'
+import type { FoldNode } from 'foldui'
 
 export interface GenericNodeSpec {
     fields: Record<string, any>
     defaults: Record<string, any>
 }
 
-type AddInput =
-    | string
-    | {
-          type: string
-          [key: string]: any
-      }
+export type NodeInput = string | (Omit<FoldNode, 'id'> & Partial<Pick<FoldNode, 'id'>>)
 
 export class SchemaBuilder<TSpec extends GenericNodeSpec> {
     private history: HistoryManager<BuilderDocumentSchema>
@@ -48,15 +44,17 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         return deepClone(this.schema)
     }
 
-    public toRenderSchema(): NodeType {
+    public toRenderSchema(): FoldNode {
         const { nodes, rootId } = this.schema
         const fields = this.nodeSpec.fields
 
-        const build = (id: string): NodeType => {
+        const build = (id: string): FoldNode => {
             const node = nodes[id]
             if (!node) throw new Error(`Node not found: ${id}`)
 
-            const result: any = {}
+            const result: any = {
+                id: node.id,
+            }
 
             for (const key of Object.keys(fields)) {
                 if (key === 'children') continue
@@ -71,21 +69,37 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         return build(rootId)
     }
 
-    public add(input: AddInput) {
+    public add(input: NodeInput) {
         const config = this.normalizeAddInput(input)
-        const node = this.createNode(config)
 
         return {
-            into: (parentId: string, index?: number) => {
+            into: (parentId: string, index?: number): string => {
                 const next = deepClone(this.schema)
-                this.attach(node, parentId, index, next)
+
+                const node = this.createNode(config)
+
+                const parent = next.nodes[parentId]
+                if (!parent) {
+                    throw new Error(`Parent not found: ${parentId}`)
+                }
+
+                node.parent = parentId
+                next.nodes[node.id] = node
+
+                if (typeof index === 'number' && index >= 0 && index <= parent.children.length) {
+                    parent.children.splice(index, 0, node.id)
+                } else {
+                    parent.children.push(node.id)
+                }
+
                 this.history.push(next)
+
                 return node.id
             },
         }
     }
 
-    private normalizeAddInput(input: AddInput) {
+    private normalizeAddInput(input: NodeInput) {
         if (typeof input === 'string') {
             return { type: input }
         }
