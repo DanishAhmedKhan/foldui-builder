@@ -19,38 +19,6 @@
         const rootId = builder.getRootId()
 
         // builder.transaction(() => {
-        //     const containerId = builder
-        //         .add({
-        //             type: 'container',
-        //             style: {
-        //                 container: {
-        //                     maxWidth: '500px',
-        //                     margin: '0 auto',
-        //                     padding: '100px 0px',
-        //                 }
-        //             }
-        //         })
-        //         .into(rootId)
-
-        //     const textId = builder.add('text').into(containerId)
-        //     const buttonId = builder.add('button').into(containerId)
-        //     builder.updateField(textId, 'props', {
-        //         tag: 'h1',
-        //         text: 'FoldUI is amazing!'
-        //     })
-        //     builder.patchField(textId, 'props', {
-        //         tag: 'h2',
-        //     })
-        //     builder.updateField(buttonId, 'style', {
-        //         button: {
-        //             background: 'coral'
-        //         }
-        //     })
-        //     builder.patchPath(buttonId, 'style.button.borderRadius', '20px')
-        // })
-
-
-        // builder.transaction(() => {
         //     const t1 = builder.add('text').into(rootId)
         //     const t2 = builder.add('text').into(rootId)
         //     builder.patchPath(t1, 'style.text.color', 'red')
@@ -59,26 +27,57 @@
         //     const b1 = builder.add('button').into(rootId)
         // })
 
+        Fold.use({
+            beforeRender({ node, styleEngine }) {
+                const parseMediaKey = (key) => {
+                    const minMatch = key.match(/^min-(\d+)$/)
+                    if (minMatch) return `(min-width: ${minMatch[1]}px)`
+
+                    const maxMatch = key.match(/^max-(\d+)$/)
+                    if (maxMatch) return `(max-width: ${maxMatch[1]}px)`
+
+                    return null
+                }
+
+                const responsive = node?.responsive
+                if (!responsive || !styleEngine) return
+
+                for (const part in responsive) {
+                    const config = responsive[part]
+
+                    for (const media in config) {
+                        const styleObj = config[media]
+                        if (!styleObj) continue
+
+                        const selector = `[data-fui-id="${node.id}"][data-part="${part}"]`
+
+                        if (media === 'base') {
+                            styleEngine.push(selector, styleObj)
+                        } else {
+                            const mediaQuery = parseMediaKey(media)
+                            if (!mediaQuery) continue
+
+                            styleEngine.push(selector, styleObj, mediaQuery)
+                        }
+                    }
+                }
+            }
+        })
+
         const selectedNodeId = rootId
         builder.transaction(() => {
             const sectionId = builder.add('section').into(selectedNodeId)
             const rowId = builder
                 .add({
                     type: 'container',
-                    props: {
-                        layout: {
-                            display: 'flex',
-                            direction: 'horizontal',
-                        },
-                        size: {
-                            maxWidth: '1200px',
-                        },
-                    },
-                    style: {
+                    responsive: {
                         container: {
-                            margin: '0 auto',
-                        },
-                    },
+                            base: {
+                                maxWidth: 800,
+                                margin: '0 auto',
+                            }
+                        }
+                    }
                 })
                 .into(sectionId)
 

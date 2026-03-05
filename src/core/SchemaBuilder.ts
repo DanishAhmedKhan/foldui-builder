@@ -8,7 +8,8 @@ export interface GenericNodeSpec {
     defaults: Record<string, any>
 }
 
-export type NodeInput = string | (Omit<FoldNode, 'id'> & Partial<Pick<FoldNode, 'id'>>)
+export type NodeOnjectInput = Omit<FoldNode, 'id'> & Partial<Pick<FoldNode, 'id'>>
+export type NodeInput = string | NodeOnjectInput
 
 export class SchemaBuilder<TSpec extends GenericNodeSpec> {
     private history: HistoryManager<BuilderDocumentSchema>
@@ -99,7 +100,7 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         }
     }
 
-    private normalizeAddInput(input: NodeInput) {
+    private normalizeAddInput(input: NodeInput): NodeOnjectInput {
         if (typeof input === 'string') {
             return { type: input }
         }
@@ -149,6 +150,53 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         next.nodes[nodeId] = this.setDeepImmutable(next.nodes[nodeId], normalizedPath, value)
 
         this.history.push(next)
+    }
+
+    public getChildren(nodeId: string): string[] {
+        const node = this.schema.nodes[nodeId]
+        if (!node) return []
+
+        return [...node.children]
+    }
+
+    public getParent(nodeId: string): string | null {
+        const node = this.schema.nodes[nodeId]
+        if (!node) return null
+
+        return node.parent ?? null
+    }
+
+    public getAncestors(nodeId: string): string[] {
+        const ancestors: string[] = []
+        let current = this.getParent(nodeId)
+
+        while (current) {
+            ancestors.push(current)
+            current = this.getParent(current)
+        }
+
+        return ancestors
+    }
+
+    public isDescendant(parentId: string, childId: string): boolean {
+        if (parentId === childId) return false
+
+        const parent = this.schema.nodes[parentId]
+        if (!parent) return false
+
+        const stack = [...parent.children]
+
+        while (stack.length > 0) {
+            const currentId = stack.pop()!
+            if (currentId === childId) return true
+
+            const node = this.schema.nodes[currentId]
+            if (node) {
+                stack.push(...node.children)
+            }
+        }
+
+        return false
     }
 
     private setDeepImmutable(obj: any, path: (string | number)[], value: any): any {
@@ -224,7 +272,7 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         }
     }
 
-    private createNode(config: { type: string; [key: string]: any }): BuilderNode {
+    private createNode(config: NodeOnjectInput): BuilderNode {
         const node: any = {
             id: crypto.randomUUID(),
             parent: null,
@@ -232,11 +280,11 @@ export class SchemaBuilder<TSpec extends GenericNodeSpec> {
         }
 
         for (const key in this.nodeSpec.defaults) {
-            node[key] = deepClone((this.nodeSpec.defaults as any)[key])
+            ;(node as any)[key] = deepClone((this.nodeSpec.defaults as any)[key])
         }
 
         for (const key in config) {
-            node[key] = config[key]
+            ;(node as any)[key] = config[key]
         }
 
         return node
